@@ -1,4 +1,4 @@
-chandra-ocr>=0.1.9
+chandra-ocr>=0.1.8
 fastapi>=0.115.0
 uvicorn[standard]>=0.32.0
 python-multipart>=0.0.9
