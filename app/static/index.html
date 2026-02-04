@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chandra OCR — загрузка PDF и распознавание</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        margin: 0;
+        padding: 24px;
+        color: #1a1a2e;
+        background: #f8fafc;
+      }
+      .container { max-width: 960px; margin: 0 auto; }
+      h1 {
+        margin: 0 0 8px 0;
+        font-size: 1.75rem;
+        color: #0f172a;
+      }
+      .subtitle {
+        color: #64748b;
+        margin-bottom: 24px;
+        font-size: 0.95rem;
+      }
+      .card {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      }
+      .upload-zone {
+        border: 2px dashed #cbd5e1;
+        border-radius: 10px;
+        padding: 32px 24px;
+        text-align: center;
+        background: #f8fafc;
+        transition: border-color 0.2s, background 0.2s;
+      }
+      .upload-zone.dragover { border-color: #3b82f6; background: #eff6ff; }
+      .upload-zone.has-file { border-color: #22c55e; background: #f0fdf4; }
+      .upload-zone input[type="file"] {
+        display: block;
+        margin: 0 auto 12px auto;
+        font-size: 0.9rem;
+      }
+      .upload-zone .hint {
+        color: #64748b;
+        font-size: 0.875rem;
+        margin-top: 8px;
+      }
+      .row {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      button {
+        padding: 10px 20px;
+        background: #2563eb;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 0.95rem;
+        cursor: pointer;
+        font-weight: 500;
+      }
+      button:hover:not(:disabled) { background: #1d4ed8; }
+      button:disabled { opacity: 0.6; cursor: not-allowed; }
+      button.secondary {
+        background: #e2e8f0;
+        color: #475569;
+      }
+      button.secondary:hover:not(:disabled) { background: #cbd5e1; }
+      .progress {
+        height: 8px;
+        background: #e2e8f0;
+        border-radius: 8px;
+        overflow: hidden;
+        margin-top: 16px;
+      }
+      .progress-bar {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, #3b82f6, #22c55e);
+        transition: width 0.25s ease;
+      }
+      .error { color: #dc2626; margin-top: 12px; font-size: 0.9rem; }
+      .tabs {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 12px;
+        flex-wrap: wrap;
+      }
+      .tabs button {
+        padding: 8px 16px;
+        background: #f1f5f9;
+        color: #475569;
+        border-radius: 8px;
+        font-size: 0.9rem;
+      }
+      .tabs button.active {
+        background: #2563eb;
+        color: white;
+      }
+      .panel {
+        display: none;
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 16px;
+        max-height: 480px;
+        overflow: auto;
+      }
+      .panel.active { display: block; }
+      .panel pre, .panel.output-text {
+        white-space: pre-wrap;
+        word-break: break-word;
+        margin: 0;
+        font-size: 0.875rem;
+        line-height: 1.5;
+      }
+      .panel.output-html { padding: 16px; }
+      .panel.output-html img { max-width: 100%; height: auto; }
+      table.structure {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.875rem;
+      }
+      table.structure th,
+      table.structure td {
+        border: 1px solid #e2e8f0;
+        padding: 10px 12px;
+        text-align: left;
+        vertical-align: top;
+      }
+      table.structure th {
+        background: #f8fafc;
+        font-weight: 600;
+        color: #334155;
+      }
+      table.structure tr:hover td { background: #f8fafc; }
+      .pill {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        font-weight: 500;
+        white-space: nowrap;
+      }
+      .pill.text { background: #dbeafe; color: #1d4ed8; }
+      .pill.table { background: #dcfce7; color: #15803d; }
+      .pill.image { background: #fce7f3; color: #be185d; }
+      .pill.math { background: #fef3c7; color: #b45309; }
+      .pill.unknown { background: #f1f5f9; color: #64748b; }
+      .meta { color: #64748b; font-size: 0.875rem; margin-top: 12px; }
+      #results { margin-top: 24px; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Chandra OCR</h1>
+      <p class="subtitle">Загрузите PDF или изображение — распознавание текста, таблиц, формул и структуры документа.</p>
+
+      <div class="card">
+        <div class="upload-zone" id="uploadZone">
+          <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.tiff,.bmp,application/pdf,image/*" />
+          <p class="hint">PDF, PNG, JPG, GIF, WebP, TIFF, BMP</p>
+          <div class="row" style="margin-top: 16px; justify-content: center;">
+            <button id="processBtn">Распознать</button>
+          </div>
+        </div>
+        <div class="progress" aria-label="progress">
+          <div class="progress-bar" id="progressBar"></div>
+        </div>
+        <div class="error" id="error"></div>
+      </div>
+
+      <div id="results" style="display: none;">
+        <div class="card">
+          <div class="tabs">
+            <button type="button" data-tab="structure" class="active">Структура</button>
+            <button type="button" data-tab="markdown">Markdown</button>
+            <button type="button" data-tab="html">HTML</button>
+          </div>
+          <div id="structurePanel" class="panel active" data-tab="structure">
+            <table class="structure" id="structureTable">
+              <thead>
+                <tr>
+                  <th>Страница</th>
+                  <th>Тип</th>
+                  <th>BBox</th>
+                  <th>Текст (фрагмент)</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+            <p class="meta" id="structureMeta"></p>
+          </div>
+          <div id="markdownPanel" class="panel output-text" data-tab="markdown"></div>
+          <div id="htmlPanel" class="panel output-html" data-tab="html"></div>
+          <p class="meta" id="meta"></p>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const uploadZone = document.getElementById("uploadZone");
+      const fileInput = document.getElementById("fileInput");
+      const processBtn = document.getElementById("processBtn");
+      const progressBar = document.getElementById("progressBar");
+      const errorBox = document.getElementById("error");
+      const results = document.getElementById("results");
+      const structurePanel = document.getElementById("structurePanel");
+      const markdownPanel = document.getElementById("markdownPanel");
+      const htmlPanel = document.getElementById("htmlPanel");
+      const structureTableBody = document.querySelector("#structureTable tbody");
+      const structureMeta = document.getElementById("structureMeta");
+      const metaEl = document.getElementById("meta");
+
+      let fakeProgressTimer = null;
+
+      function resetUI() {
+        errorBox.textContent = "";
+        progressBar.style.width = "0%";
+        if (fakeProgressTimer) clearInterval(fakeProgressTimer);
+        fakeProgressTimer = null;
+      }
+
+      function setUploadState(hasFile) {
+        uploadZone.classList.toggle("has-file", !!hasFile);
+      }
+
+      fileInput.addEventListener("change", () => setUploadState(!!fileInput.files.length));
+
+      uploadZone.addEventListener("dragover", (e) => { e.preventDefault(); uploadZone.classList.add("dragover"); });
+      uploadZone.addEventListener("dragleave", () => uploadZone.classList.remove("dragover"));
+      uploadZone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        uploadZone.classList.remove("dragover");
+        if (e.dataTransfer.files.length) {
+          fileInput.files = e.dataTransfer.files;
+          setUploadState(true);
+        }
+      });
+
+      function startFakeProgress() {
+        let progress = 5;
+        progressBar.style.width = progress + "%";
+        fakeProgressTimer = setInterval(() => {
+          progress = Math.min(progress + Math.random() * 12, 90);
+          progressBar.style.width = progress + "%";
+        }, 350);
+      }
+
+      function finishProgress() {
+        if (fakeProgressTimer) clearInterval(fakeProgressTimer);
+        progressBar.style.width = "100%";
+      }
+
+      function pillClass(type) {
+        const t = (type || "").toLowerCase();
+        if (t.includes("table")) return "table";
+        if (t.includes("image") || t.includes("img")) return "image";
+        if (t.includes("math") || t.includes("equation")) return "math";
+        if (t.includes("text") || t.includes("paragraph") || t.includes("heading")) return "text";
+        return "unknown";
+      }
+
+      function showTab(tabName) {
+        document.querySelectorAll(".tabs button").forEach((b) => {
+          b.classList.toggle("active", b.dataset.tab === tabName);
+        });
+        [structurePanel, markdownPanel, htmlPanel].forEach((el) => {
+          el.classList.toggle("active", el.dataset.tab === tabName);
+        });
+      }
+
+      document.querySelectorAll(".tabs button").forEach((b) => {
+        b.addEventListener("click", () => showTab(b.dataset.tab));
+      });
+
+      processBtn.addEventListener("click", async () => {
+        resetUI();
+        results.style.display = "none";
+
+        const file = fileInput.files[0];
+        if (!file) {
+          errorBox.textContent = "Выберите или перетащите PDF или изображение.";
+          return;
+        }
+
+        processBtn.disabled = true;
+        setUploadState(true);
+        startFakeProgress();
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        try {
+          const response = await fetch("/parse", { method: "POST", body: formData });
+          const data = await response.json().catch(() => ({}));
+          finishProgress();
+
+          if (!response.ok) throw new Error(data.error || "Ошибка обработки");
+
+          results.style.display = "block";
+          showTab("structure");
+
+          markdownPanel.textContent = data.markdown || "";
+          markdownPanel.classList.add("output-text");
+          htmlPanel.innerHTML = data.html || "";
+          htmlPanel.classList.add("output-html");
+
+          const pages = data.num_pages ?? 0;
+          const tokens = data.total_token_count ?? 0;
+          metaEl.textContent = "Страниц: " + pages + (tokens ? ", токенов: " + tokens : "") + ".";
+
+          const items = data.structure || [];
+          structureTableBody.innerHTML = "";
+          if (items.length === 0) {
+            structureMeta.textContent = "Элементов структуры не возвращено (chunks могут быть в другом формате).";
+          } else {
+            structureMeta.textContent = "Элементов: " + items.length + ".";
+            items.forEach((obj) => {
+              const row = document.createElement("tr");
+              const pageCell = document.createElement("td");
+              const typeCell = document.createElement("td");
+              const bboxCell = document.createElement("td");
+              const textCell = document.createElement("td");
+
+              pageCell.textContent = (obj.page ?? "—").toString();
+              typeCell.innerHTML = '<span class="pill ' + pillClass(obj.type) + '">' + (obj.type || "—") + "</span>";
+              if (Array.isArray(obj.bbox) && obj.bbox.length >= 4) {
+                bboxCell.textContent = obj.bbox.map((x) => Number(x).toFixed(2)).join(", ");
+              } else {
+                bboxCell.textContent = obj.bbox ? JSON.stringify(obj.bbox) : "—";
+              }
+              textCell.textContent = (obj.text || "").slice(0, 300);
+              if ((obj.text || "").length > 300) textCell.textContent += "…";
+
+              row.appendChild(pageCell);
+              row.appendChild(typeCell);
+              row.appendChild(bboxCell);
+              row.appendChild(textCell);
+              structureTableBody.appendChild(row);
+            });
+          }
+        } catch (err) {
+          finishProgress();
+          errorBox.textContent = err?.message || String(err);
+        } finally {
+          processBtn.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,21 @@
+version: "3.9"
+
+services:
+  chandra-ocr:
+    build: .
+    image: chandra-ocr:latest
+    container_name: chandra-ocr
+    ports:
+      - "8002:8000"
+    environment:
+      - MODEL_CHECKPOINT=datalab-to/chandra
+      - MAX_OUTPUT_TOKENS=8192
+    restart: unless-stopped
+    # For GPU (optional): uncomment below and use image with CUDA
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
