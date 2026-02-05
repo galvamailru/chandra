@@ -9,7 +9,10 @@ FROM python:3.11-slim AS builder
 WORKDIR /app
 COPY requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --no-cache-dir --target=/app/deps -r requirements.txt
+    pip install --no-cache-dir --target=/app/deps -r requirements.txt && \
+    find /app/deps -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true && \
+    find /app/deps -type f -name "*.pyc" -delete 2>/dev/null || true && \
+    find /app/deps -type d -name tests -exec rm -rf {} + 2>/dev/null || true
 
 # ----------------------------------------
 # Stage 2: runtime image (no RUN pip; only COPY from builder)

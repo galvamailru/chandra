@@ -4,7 +4,7 @@ HTTP-сервис OCR на базе [Chandra](https://github.com/datalab-to/chan
 
 ## Запуск в Docker
 
-Первый запуск может занять **10–20 минут** (установка torch/transformers); этап «exporting layers» — ещё **5–15 минут** из‑за размера образа. Это нормально, сборка не зависает.
+Первый запуск может занять **10–20 минут** (установка torch/transformers); этап «exporting layers» — ещё **5–15 минут** из‑за размера образа. На Windows (Docker Desktop / WSL2) экспорт большого слоя иногда падает с ошибками `lchown ... no such file or directory` или `lease does not exist: not found`. В таком случае соберите образ **на Linux** (VM, WSL2 с проектом на диске WSL, не на `/mnt/c`) или в CI, затем сохраните образ и загрузите на нужную машину.
 
 ```bash
 docker compose build
