@@ -1,5 +1,19 @@
 # Chandra OCR service (HF method — single container)
+# Multi-stage: heavy pip layer stays in builder; final image gets COPY only (avoids WSL2 lchown/extract bugs).
 # Requires: poppler for PDF rasterization
+# First build: 10–20 min; exporting final image is faster (fewer/lighter layers).
+# ----------------------------------------
+# Stage 1: install dependencies (big layer stays here)
+# ----------------------------------------
+FROM python:3.11-slim AS builder
+WORKDIR /app
+COPY requirements.txt .
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --no-cache-dir --target=/app/deps -r requirements.txt
+
+# ----------------------------------------
+# Stage 2: runtime image (no RUN pip; only COPY from builder)
+# ----------------------------------------
 FROM python:3.11-slim
 
 RUN apt-get update && \
@@ -10,11 +24,11 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
+COPY --from=builder /app/deps /app/deps
 COPY app ./app
+
+ENV PYTHONPATH=/app/deps
+ENV PATH="/app/deps/bin:${PATH}"
 
 EXPOSE 8000
 

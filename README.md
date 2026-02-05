@@ -4,8 +4,11 @@ HTTP-сервис OCR на базе [Chandra](https://github.com/datalab-to/chan
 
 ## Запуск в Docker
 
+Первый запуск может занять **10–20 минут** (установка torch/transformers); этап «exporting layers» — ещё **5–15 минут** из‑за размера образа. Это нормально, сборка не зависает.
+
 ```bash
-docker compose up -d --build
+docker compose build
+docker compose up -d
 ```
 
 Сервис будет доступен на **http://localhost:8002**.
